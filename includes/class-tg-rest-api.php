@@ -1,7 +1,7 @@
 <?php
 
 class TG_REST_API {
-	const THEME_OPTION_GROUP = 'health_theme_options';
+	const THEME_OPTION_GROUP = 'mak_theme_options';
 	const TGAD_PREFIX        = 'mad_';
 
 	private static $instance;
@@ -20,7 +20,7 @@ class TG_REST_API {
 	static public function switch_theme() {
 		if ( !class_exists('Nginx_Mobile_Theme') )
 			return;
-		if ( !isset($_SERVER['REQUEST_URI']) || !preg_match('#/(tgslide|tgcat_tab)/mobile#' , $_SERVER['REQUEST_URI']))
+		if ( !isset($_SERVER['REQUEST_URI']) || !preg_match('#/(mak_slide|mak_cat_tab)/mobile#' , $_SERVER['REQUEST_URI']))
 			return;
 
 		$mobile_theme = apply_filters(
@@ -29,8 +29,8 @@ class TG_REST_API {
 			);
 		$mobile_theme = isset($mobile_theme['smartphone']) ? $mobile_theme['smartphone'] : 'appwoman-theme-frame-mobile';
 		if ( $mobile_theme ) {
-		    $switch_theme = new Megumi_SwitchTheme($mobile_theme);
-		    $switch_theme->apply();
+			$switch_theme = new Megumi_SwitchTheme($mobile_theme);
+			$switch_theme->apply();
 		}
 	}
 
@@ -48,23 +48,29 @@ class TG_REST_API {
 	}
 
 	private function is_singular() {
+		global $wp_query;
 		if ( !isset($_SERVER['REQUEST_URI']) )
 			return false;
 
 		$preg_pattern = '#^/wp-json/('.
 			implode('|', array(
 				'posts',
-				'tgrecommend/(pc|mobile)',
-				'tgcontent_nav',
-				'tgeditor_choice',
-				'tgcat_tab/(pc|mobile)',
+				'mak_recommend/(pc|mobile)',
+				'mak_editor_choice',
+				'mak_cat_tab/(pc|mobile)',
+				'mak_themeoption',
+				'mak_themeoption/google_analytics_code',
 			))
 			.')/(?<id>[\d]+)#';
-		if ( preg_match($preg_pattern, $_SERVER['REQUEST_URI'], $matches) )
+		if ( preg_match($preg_pattern, $_SERVER['REQUEST_URI'], $matches) ) {
 			$id = $matches['id'];
-		else
+		} else {
 			$id = false;
+		}
 		unset($matches);
+		if ( $id ) {
+			$wp_query->is_singular = true;
+		}
 
 		return $id;
 	}
@@ -92,52 +98,46 @@ class TG_REST_API {
 
 	// regist path
 	public function register_routes( $routes ) {
-		// menus
-		$routes['/tgmenu'] = array(
-			array( array( $this, 'get_nav_menus'), WP_JSON_Server::READABLE ),
-		);
-		$routes['/tgmenu/(?P<menu_id>.+)'] = array(
-			array( array( $this, 'get_nav_menu_items'), WP_JSON_Server::READABLE ),
-		);
 
-		$routes['/tgthememenu'] = array(
+		// menus
+		$routes['/mak_menu'] = array(
 			array( array( $this, 'get_nav_menus'), WP_JSON_Server::READABLE ),
 		);
-		$routes['/tgthememenu/(?P<theme_location>.+)'] = array(
+		$routes['/mak_menu/(?P<theme_location>.+)'] = array(
 			array( array( $this, 'get_wp_nav_menu'), WP_JSON_Server::READABLE ),
 		);
 
 		// sidebars
-		$routes['/tgsidebar'] = array(
+		$routes['/mak_sidebar'] = array(
 			array( array( $this, 'get_sidebars_widgets'), WP_JSON_Server::READABLE ),
 		);
-		$routes['/tgsidebar/(?P<index>.+)'] = array(
+		$routes['/mak_sidebar/(?P<index>.+)'] = array(
 			array( array( $this, 'dynamic_sidebar'), WP_JSON_Server::READABLE ),
 		);
 
 		// theme option
-		$routes['/tgthemeoption'] = array(
+		$routes['/mak_themeoption/?(?P<post_id>[\d]+)?'] = array(
 			array( array( $this, 'get_theme_options'), WP_JSON_Server::READABLE ),
 		);
-		$routes['/tgthemeoption/(?P<option_name>.+)'] = array(
+		$routes['/mak_themeoption/(?P<option_name>[^/]+)/?(?P<post_id>[\d]+)?'] = array(
 			array( array( $this, 'get_theme_option'), WP_JSON_Server::READABLE ),
 		);
 
 		// ad
-		$routes['/tgad'] = array(
-			array( array( $this, 'get_tgad_options'), WP_JSON_Server::READABLE ),
+		$routes['/mak_adoption'] = array(
+			array( array( $this, 'get_mak_ad_options'), WP_JSON_Server::READABLE ),
 		);
-		$routes['/tgad/(?P<option_name>.+)'] = array(
-			array( array( $this, 'get_tgad_option'), WP_JSON_Server::READABLE ),
+		$routes['/mak_adoption/(?P<option_name>.+)'] = array(
+			array( array( $this, 'get_mak_adoption_option'), WP_JSON_Server::READABLE ),
 		);
 
 		// pickup
-		$routes['/tgpickup'] = array(
-			array( array( $this, 'get_tgpickup'), WP_JSON_Server::READABLE ),
+		$routes['/mak_pickup'] = array(
+			array( array( $this, 'get_mak_pickup'), WP_JSON_Server::READABLE ),
 		);
 
 		// recomend
-		$routes['/tgrecommend/(?P<device>pc|mobile)/(?P<id>\d.+)'] = array(
+		$routes['/mak_recommend/(?P<device>pc|mobile)/(?P<id>\d.+)'] = array(
 			array( array( $this, 'get_recommend'), WP_JSON_Server::READABLE ),
 		);
 
@@ -147,41 +147,38 @@ class TG_REST_API {
 		);
 
 		// Related Menu
-		$routes['/tgrelated_menu'] = array(
-			array( array( $this, 'get_tgrelated_menu'), WP_JSON_Server::READABLE ),
+		$routes['/mak_related_menu'] = array(
+			array( array( $this, 'get_mak_related_menu'), WP_JSON_Server::READABLE ),
 		);
 
 		// adjacent_posts_rel_link
-		$routes['/tgcontent_nav/(?P<id>\d+)'] = array(
-			array( array( $this, 'get_health_content_nav'), WP_JSON_Server::READABLE ),
-		);
 		$routes['/posts/(?P<id>\d+)/(?P<adjacent>prev|next)'] = array(
 			array( array( $this, 'adjacent_posts_rel_link'), WP_JSON_Server::READABLE ),
 		);
 
 		// slide post list
-		$routes['/tgslide/(?P<device>pc|mobile)'] = array(
+		$routes['/mak_slide/(?P<device>pc|mobile)'] = array(
 			array( array( $this, 'get_slide_post_list'), WP_JSON_Server::READABLE ),
 		);
 
 		// carousel post list
-		$routes['/tgcarousel'] = array(
+		$routes['/mak_carousel'] = array(
 			array( array( $this, 'get_carousel_post_list'), WP_JSON_Server::READABLE ),
 		);
 
 		// editor choice
-		$routes['/tgeditor_choice/(?P<device>pc|mobile)'] = array(
+		$routes['/mak_editor_choice/(?P<device>pc|mobile)'] = array(
 			array( array( $this, 'get_editor_choice'), WP_JSON_Server::READABLE ),
 		);
-		$routes['/tgeditor_choice/(?P<id>\d+)'] = array(
+		$routes['/mak_editor_choice/(?P<id>\d+)'] = array(
 			array( array( $this, 'get_editor_choice_with_id'), WP_JSON_Server::READABLE ),
 		);
 
 		// category tab
-		$routes['/tgcat_tab/(?P<device>pc|mobile)'] = array(
+		$routes['/mak_cat_tab/(?P<device>pc|mobile)'] = array(
 			array( array( $this, 'get_category_post_list'), WP_JSON_Server::READABLE ),
 		);
-		$routes['/tgcat_tab/(?P<device>pc|mobile)/(?P<id>\d+)'] = array(
+		$routes['/mak_cat_tab/(?P<device>pc|mobile)/(?P<id>\d+)'] = array(
 			array( array( $this, 'get_category_post_list_with_id'), WP_JSON_Server::READABLE ),
 		);
 
@@ -198,15 +195,6 @@ class TG_REST_API {
 			 'nav_menu');
 		$menus = $wpdb->get_results($sql);
 		return $menus;
-	}
-
-	public function get_nav_menu_items( $menu_id, $_headers ) {
-		$menu = wp_get_nav_menu_object($menu_id);
-		$menu_items = 
-			( $menu && ! is_wp_error($menu) )
-			? wp_get_nav_menu_items( $menu->term_id, array( 'update_post_term_cache' => false ) )
-			: array();
-		return $menu_items;
 	}
 
 	public function get_wp_nav_menu( $theme_location, $_headers ) {
@@ -227,7 +215,7 @@ class TG_REST_API {
 	public function dynamic_sidebar( $index, $_headers ) {
 		$sidebars = $this->get_sidebars_widgets();
 		if ( !isset($sidebars[$index]) )
-			return new WP_Error( 'tg_rest_api_tgsidebar_invalid_index', __( 'Invalid index.' ), array( 'status' => 400 ) );
+			return new WP_Error( 'mak_rest_api_sidebar_invalid_index', __( 'Invalid index.' ), array( 'status' => 400 ) );
 
 		ob_start();
 		dynamic_sidebar( $index );
@@ -238,56 +226,66 @@ class TG_REST_API {
 
 	// theme option
 	private function get_theme_options_name() {
-		static $health_theme_options;
+		static $mak_theme_options;
 		global $new_whitelist_options;
 
-		if ( isset($health_theme_options) )
-			return $health_theme_options;
+		if ( isset($mak_theme_options) )
+			return $mak_theme_options;
 
 		$new_whitelist_options_old = $new_whitelist_options;
-		if (function_exists('health_register_setting'))
-			health_register_setting();
-		$health_theme_options =
+		if (function_exists('mak_register_setting'))
+			mak_register_setting();
+		$mak_theme_options =
 			isset($new_whitelist_options[self::THEME_OPTION_GROUP])
 			? $new_whitelist_options[self::THEME_OPTION_GROUP]
 			: array();
-		$health_theme_options =
+		$mak_theme_options =
 			isset($new_whitelist_options[self::THEME_OPTION_GROUP])
 			? $new_whitelist_options[self::THEME_OPTION_GROUP]
 			: array();
-		return $health_theme_options;
+		return $mak_theme_options;
 	}
 
-	public function get_theme_options( $_headers = array() ) {
-		$health_theme_options_key = $this->get_theme_options_name();
-		$health_theme_options = array();
-		foreach( $health_theme_options_key as $option_name ) {
+	public function get_theme_options( $post_id = '', $_headers = array() ) {
+		$mak_theme_options_key = $this->get_theme_options_name();
+		$mak_theme_options = array();
+		foreach( $mak_theme_options_key as $option_name ) {
 			$value = $this->get_theme_option( $option_name );
 			if ( ! is_wp_error($value) )
-				$health_theme_options[] = $value;
+				$mak_theme_options[] = $value;
 		}
-		return $health_theme_options;
+		return $mak_theme_options;
 	}
 
-	public function get_theme_option( $option_name, $_headers = array() ) {
-		static $health_theme_options_key;
+	public function get_theme_option( $option_name, $post_id = '', $_headers = array() ) {
+		global $posts, $post;
+		static $mak_theme_options_key;
 
-		if ( !isset($health_theme_options_key) ) {
-			$health_theme_options_key = $this->get_theme_options_name();
-			if (function_exists('health_register_setting'))
-				health_register_setting();
-			if (function_exists('health_theme_options_fields'))
-				health_theme_options_fields();
+		if ( !isset($mak_theme_options_key) ) {
+			$mak_theme_options_key = $this->get_theme_options_name();
+			if (function_exists('mak_register_setting'))
+				mak_register_setting();
+			if (function_exists('mak_theme_options_fields'))
+				mak_theme_options_fields();
 		}
 
-		if ( !in_array($option_name ,$health_theme_options_key) )
-			return new WP_Error( 'tg_rest_api_tgthemeoption_invalid_option_name', __( 'Invalid option name.' ), array( 'status' => 400 ) );
+		if ( !in_array($option_name ,$mak_theme_options_key) )
+			return new WP_Error( 'mak_rest_api_themeoption_invalid_option_name', sprintf(__( 'Invalid option name.' ).' : %s', $option_name), array( 'status' => 400 ) );
 
-		return array('name' => $option_name, 'value' => get_option($option_name));
+		$value = get_option($option_name);
+		if ( 'google_analytics_code' == $option_name ) {
+			if ( $post_id && $this->is_singular() ) {
+				$post = get_post(intval($post_id));
+				$posts = array($post);
+			}
+			$value = do_shortcode($value);
+		}
+
+		return array('name' => $option_name, 'value' => $value);
 	}
 
 	// ad
-	private function get_tgad_options_name() {
+	private function get_mak_ad_options_name() {
 		static $option_names;
 		global $wpdb;
 
@@ -303,32 +301,32 @@ class TG_REST_API {
 		return $option_names ? $option_names : array();
 	}
 
-	public function get_tgad_options( $_headers = array() ) {
-		$tgad_options_key = $this->get_tgad_options_name();
-		$tgad_options = array();
-		foreach( $tgad_options_key as $option_name ) {
-			$value = $this->get_tgad_option( $option_name );
+	public function get_mak_ad_options( $_headers = array() ) {
+		$mak_ad_options_key = $this->get_mak_ad_options_name();
+		$mak_ad_options = array();
+		foreach( $mak_ad_options_key as $option_name ) {
+			$value = $this->get_mak_ad_option( $option_name );
 			if ( ! is_wp_error($value) )
-				$tgad_options[] = $value;
+				$mak_ad_options[] = $value;
 		}
-		return $tgad_options;
+		return $mak_ad_options;
 	}
 
-	public function get_tgad_option( $option_name, $_headers = array() ) {
-		static $tgad_options;
-		if ( !isset($tgad_options) )
-			$tgad_options = $this->get_tgad_options_name();
-		if ( !in_array($option_name, $tgad_options) ) {
-			return new WP_Error( 'tg_rest_api_tgad_invalid_option_name', __( 'Invalid option name.' ), array( 'status' => 400 ) );
+	public function get_mak_ad_option( $option_name, $_headers = array() ) {
+		static $mak_ad_options;
+		if ( !isset($mak_ad_options) )
+			$mak_ad_options = $this->get_mak_ad_options_name();
+		if ( !in_array($option_name, $mak_ad_options) ) {
+			return new WP_Error( 'mak_rest_api_ad_invalid_option_name', __( 'Invalid option name.' ), array( 'status' => 400 ) );
 		}
 		return array('name' => $option_name, 'value' => get_option($option_name));
 	}
 
 	// pickup
-	public function get_tgpickup( $_headers ) {
-		if ( !function_exists('health_get_pickup'))
-			return new WP_Error( 'tg_rest_api_tgpickup', __( 'Function health_get_pickup() is not exists.' ), array( 'status' => 400 ) );
-		$content = health_get_pickup();
+	public function get_mak_pickup( $_headers ) {
+		if ( !function_exists('mak_get_pickup'))
+			return new WP_Error( 'mak_rest_api_pickup', __( 'Function mak_get_pickup() is not exists.' ), array( 'status' => 400 ) );
+		$content = mak_get_pickup();
 		return array('content' => $content ? $content : '');
 	}
 
@@ -336,11 +334,11 @@ class TG_REST_API {
 	public function get_recommend( $device, $id, $_headers ) {
 		global $posts, $post;
 		$id = intval($id);
-		if ( !function_exists('health_get_related_post_list'))
-			return new WP_Error( 'tg_rest_api_tgrecommend', __( 'Function health_get_related_post_list() is not exists.' ), array( 'status' => 400 ) );
+		if ( !function_exists('mak_get_related_post_list'))
+			return new WP_Error( 'mak_rest_api_tgrecommend', __( 'Function mak_get_related_post_list() is not exists.' ), array( 'status' => 400 ) );
 		$post = get_post($id);
 		$posts = array($post);
-		$content = health_get_related_post_list( array( 'device' => $device ) );
+		$content = mak_get_related_post_list( array( 'device' => $device ) );
 		return array('post_id' => $id, 'content' => $content ? $content : '');
 	}
 
@@ -348,33 +346,21 @@ class TG_REST_API {
 	public function get_external_site( $id, $_headers ) {
 		global $posts, $post;
 		$id = intval($id);
-		if ( !function_exists('health_get_external_site'))
-			return new WP_Error( 'tg_rest_api_external_site', __( 'Function health_get_external_site() is not exists.' ), array( 'status' => 400 ) );
-		$content = health_get_external_site( array( 'id' => $id ) );
+		if ( !function_exists('mak_get_external_site'))
+			return new WP_Error( 'mak_rest_api_external_site', __( 'Function mak_get_external_site() is not exists.' ), array( 'status' => 400 ) );
+		$content = mak_get_external_site( array( 'id' => $id ) );
 		return array('post_id' => $id, 'content' => $content ? $content : '');
 	}
 
-
 	// Related Menu
-	public function get_tgrelated_menu( $_headers ) {
-		if ( !function_exists('health_get_related_menu'))
-			return new WP_Error( 'tg_rest_api_tgrelated_menu', __( 'Function health_get_related_menu() is not exists.' ), array( 'status' => 400 ) );
-		$content = health_get_related_menu();
+	public function get_mak_related_menu( $_headers ) {
+		if ( !function_exists('mak_get_related_menu'))
+			return new WP_Error( 'mak_rest_api_mak_related_menu', __( 'Function mak_get_related_menu() is not exists.' ), array( 'status' => 400 ) );
+		$content = mak_get_related_menu();
 		return array('content' => $content ? $content : '');
 	}
 
 	// adjacent_posts_rel_link
-	public function get_health_content_nav( $id, $_headers ) {
-		global $posts, $post;
-		$id = intval($id);
-		if ( !function_exists('get_health_content_nav'))
-			return new WP_Error( 'tg_rest_api_content_nav', __( 'Function get_health_content_nav() is not exists.' ), array( 'status' => 400 ) );
-		$post = get_post($id);
-		$posts = array($post);
-		$content = get_health_content_nav();
-		return array('post_id' => $id, 'content' => $content ? $content : '');
-	}
-
 	public function adjacent_posts_rel_link( $id, $adjacent, $_headers ) {
 		global $posts, $post;
 		$id = intval($id);
@@ -403,37 +389,37 @@ class TG_REST_API {
 	// slide post list
 	public function get_slide_post_list( $device, $_headers ) {
 		$content = '';
-		if ( !function_exists('health_get_slide_post_list'))
-			return new WP_Error( 'tg_rest_api_tgslide', __( 'Function health_get_slide_post_list() is not exists.' ), array( 'status' => 400 ) );
-		$content = health_get_slide_post_list( array( 'device' => $device ) );
+		if ( !function_exists('mak_get_slide_post_list'))
+			return new WP_Error( 'mak_rest_api_slide', __( 'Function mak_get_slide_post_list() is not exists.' ), array( 'status' => 400 ) );
+		$content = mak_get_slide_post_list( array( 'device' => $device ) );
 		return array('content' => $content ? $content : '');
 	}
 
 	// carousel post list
 	public function get_carousel_post_list( $_headers ) {
-		if ( !function_exists('health_get_carousel_post_list'))
-			return new WP_Error( 'tg_rest_api_tgcarousel', __( 'Function health_get_carousel_post_list() is not exists.' ), array( 'status' => 400 ) );
-		$content = health_get_carousel_post_list();
+		if ( !function_exists('mak_get_carousel_post_list'))
+			return new WP_Error( 'mak_rest_api_carousel', __( 'Function mak_get_carousel_post_list() is not exists.' ), array( 'status' => 400 ) );
+		$content = mak_get_carousel_post_list();
 		return array('content' => $content ? $content : '');
 	}
 
 	// editor choice
 	public function get_editor_choice( $device, $_headers ) {
 		$content = '';
-		if ( !function_exists('health_get_editor_choice'))
-			return new WP_Error( 'tg_rest_api_tgeditor_choice', __( 'Function health_get_editor_choice() is not exists.' ), array( 'status' => 400 ) );
-		$content = health_get_editor_choice( '', '', $device );
+		if ( !function_exists('mak_get_editor_choice'))
+			return new WP_Error( 'mak_rest_api_editor_choice', __( 'Function mak_get_editor_choice() is not exists.' ), array( 'status' => 400 ) );
+		$content = mak_get_editor_choice( '', '', $device );
 		return array('content' => $content ? $content : '');
 	}
 
 	public function get_editor_choice_with_id( $id, $_headers) {
 		global $posts, $post;
 		$id = intval($id);
-		if ( !function_exists('health_get_editor_choice'))
-			return new WP_Error( 'tg_rest_api_tgeditor_choice', __( 'Function health_get_editor_choice() is not exists.' ), array( 'status' => 400 ) );
+		if ( !function_exists('mak_get_editor_choice'))
+			return new WP_Error( 'mak_rest_api_editor_choice', __( 'Function mak_get_editor_choice() is not exists.' ), array( 'status' => 400 ) );
 		$post = get_post($id);
 		$posts = array($post);
-		$content = health_get_editor_choice();
+		$content = mak_get_editor_choice();
 		return array('post_id' => $id, 'content' => $content ? $content : '');
 	}
 
@@ -442,17 +428,17 @@ class TG_REST_API {
 		$content = '';
 		switch ($device) {
 		case 'pc':
-			if ( !function_exists('health_get_category_induction_post_list'))
-				return new WP_Error( 'tg_rest_api_tgcat_tab', __( 'Function health_get_category_induction_post_list() is not exists.' ), array( 'status' => 400 ) );
-			$content = health_get_category_induction_post_list();
+			if ( !function_exists('mak_get_category_induction_post_list'))
+				return new WP_Error( 'mak_rest_api_cat_tab', __( 'Function mak_get_category_induction_post_list() is not exists.' ), array( 'status' => 400 ) );
+			$content = mak_get_category_induction_post_list();
 			break;
 		case 'mobile':
-			if ( !function_exists('health_get_category_posts_tab'))
-				return new WP_Error( 'tg_rest_api_tgcat_tab', __( 'Function health_get_category_posts_tab() is not exists.' ), array( 'status' => 400 ) );
-			$content = health_get_category_posts_tab();
+			if ( !function_exists('mak_get_category_posts_tab'))
+				return new WP_Error( 'mak_rest_api_cat_tab', __( 'Function mak_get_category_posts_tab() is not exists.' ), array( 'status' => 400 ) );
+			$content = mak_get_category_posts_tab();
 			break;
 		default:
-			return new WP_Error( 'tg_rest_api_tgcat_tab', __( 'Invalid device.' ), array( 'status' => 400 ) );
+			return new WP_Error( 'mak_rest_api_cat_tab', __( 'Invalid device.' ), array( 'status' => 400 ) );
 		}
 		return array('content' => $content ? $content : '');
 	}
@@ -464,17 +450,17 @@ class TG_REST_API {
 		$posts = array($post);
 		switch ($device) {
 		case 'pc':
-			if ( !function_exists('health_get_category_induction_post_list'))
-				return new WP_Error( 'tg_rest_api_tgcat_tab', __( 'Function health_get_category_induction_post_list() is not exists.' ), array( 'status' => 400 ) );
-			$content = health_get_category_induction_post_list();
+			if ( !function_exists('mak_get_category_induction_post_list'))
+				return new WP_Error( 'mak_rest_api_cat_tab', __( 'Function mak_get_category_induction_post_list() is not exists.' ), array( 'status' => 400 ) );
+			$content = mak_get_category_induction_post_list();
 			break;
 		case 'mobile':
-			if ( !function_exists('health_get_category_posts_tab'))
-				return new WP_Error( 'tg_rest_api_tgcat_tab', __( 'Function health_get_category_posts_tab() is not exists.' ), array( 'status' => 400 ) );
-			$content = health_get_category_posts_tab();
+			if ( !function_exists('mak_get_category_posts_tab'))
+				return new WP_Error( 'mak_rest_api_cat_tab', __( 'Function mak_get_category_posts_tab() is not exists.' ), array( 'status' => 400 ) );
+			$content = mak_get_category_posts_tab();
 			break;
 		default:
-			return new WP_Error( 'tg_rest_api_tgcat_tab', __( 'Invalid device.' ), array( 'status' => 400 ) );
+			return new WP_Error( 'mak_rest_api_cat_tab', __( 'Invalid device.' ), array( 'status' => 400 ) );
 		}
 		return array('post_id' => $id, 'content' => $content ? $content : '');
 	}
