@@ -114,6 +114,11 @@ class MAK_REST_API {
 			array( array( $this, 'get_mak_pickup'), WP_JSON_Server::READABLE ),
 		);
 
+		// ranking
+		$routes['/mak_ranking'] = array(
+			array( array( $this, 'get_mak_ranking'), WP_JSON_Server::READABLE ),
+		);
+
 		// Related Post
 		$routes['/mak_related/(?P<device>pc|mobile)/(?P<id>\d+)'] = array(
 			array( array( $this, 'get_related'), WP_JSON_Server::READABLE ),
@@ -272,6 +277,14 @@ class MAK_REST_API {
 		if ( !function_exists('mak_get_pickup'))
 			return new WP_Error( 'mak_rest_api_pickup', __( 'Function mak_get_pickup() is not exists.' ), array( 'status' => 400 ) );
 		$content = mak_get_pickup();
+		return array('content' => $content ? $content : '');
+	}
+
+	// ranking
+	public function get_mak_ranking( $_headers ) {
+		if ( !function_exists('sga_ranking_shortcode'))
+			return new WP_Error( 'mak_rest_api_ranking', __( 'Function sga_ranking_shortcode() is not exists.' ), array( 'status' => 400 ) );
+		$content = sga_ranking_shortcode(array());
 		return array('content' => $content ? $content : '');
 	}
 
