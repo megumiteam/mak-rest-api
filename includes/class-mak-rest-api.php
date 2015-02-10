@@ -120,7 +120,7 @@ class MAK_REST_API {
 		);
 
 		// Related Post
-		$routes['/mak_related/(?P<device>pc|mobile)/(?P<id>\d+)'] = array(
+		$routes['/mak_related/(?P<id>\d+)'] = array(
 			array( array( $this, 'get_related'), WP_JSON_Server::READABLE ),
 		);
 
@@ -282,21 +282,21 @@ class MAK_REST_API {
 
 	// ranking
 	public function get_mak_ranking( $_headers ) {
-		if ( !function_exists('sga_ranking_shortcode'))
-			return new WP_Error( 'mak_rest_api_ranking', __( 'Function sga_ranking_shortcode() is not exists.' ), array( 'status' => 400 ) );
-		$content = sga_ranking_shortcode(array());
+		if ( !function_exists('mak_get_ranking_post_widget'))
+			return new WP_Error( 'mak_rest_api_ranking', __( 'Function mak_get_ranking_post_widget() is not exists.' ), array( 'status' => 400 ) );
+		$content = mak_get_ranking_post_widget();
 		return array('content' => $content ? $content : '');
 	}
 
 	// Related Post
-	public function get_related( $device, $id, $_headers ) {
+	public function get_related( $id, $_headers ) {
 		global $posts, $post;
 		$id = intval($id);
 		if ( !function_exists('mak_get_related_post_list'))
 			return new WP_Error( 'mak_rest_api_related', __( 'Function mak_get_related_post_list() is not exists.' ), array( 'status' => 400 ) );
 		$post = get_post($id);
 		$posts = array($post);
-		$content = mak_get_related_post_list( array( 'device' => $device ) );
+		$content = mak_get_related_post_list();
 		return array('post_id' => $id, 'content' => $content ? $content : '');
 	}
 
